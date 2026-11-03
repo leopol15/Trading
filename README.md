@@ -92,7 +92,7 @@ in-sample part, then checked on data they never saw (`results/optimize.txt`):
    stop needs about €2000 notional, which is more than a €1000 spot account
    can buy.
 
-With €1000 and 1% risk (€10), a EURUSD stop of 15 pips is about 0.06 lots.
+With €1000 and 1% risk (€10), a EURUSD stop of 15 pips is about 0.07 lots.
 You need a broker that allows **micro lots (0.01)**. On EURUSD 2024 the
 backtest made about €6 a month. That's a skill-building account, not an income.
 
