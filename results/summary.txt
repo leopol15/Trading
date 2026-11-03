@@ -1,0 +1,8 @@
+       dataset  trades  win_rate_pct  avg_R  expectancy_eur  profit_factor  net_profit  end_balance  return_pct  max_drawdown_pct  longs  shorts  exit_target  exit_stop  exit_session_end  exit_end_of_data
+EURUSD_2017_18      28          35.7  0.098            0.92           1.23       25.84      1025.84        2.58             -4.72     17      11            2          8                17                 1
+   EURUSD_2024      42          42.9  0.172            1.70           1.40       71.49      1071.49        7.15             -6.14     13      29            3         15                24                 0
+   XAUUSD_2025      29          41.4 -0.064           -0.67           0.81      -19.55       980.45       -1.95             -5.79     21       8            0          7                22                 0
+XAUUSD_2025_26      13          61.5  0.451            4.57           3.00       59.44      1059.44        5.94             -1.76      9       4            1          2                10                 0
+  BTCUSDT_2026      30          36.7 -0.059           -0.64           0.85      -19.20       980.80       -1.92             -6.49     19      11            2          4                24                 0
+
+saved /home/user/Trading/results/equity.png
