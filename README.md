@@ -1,137 +1,152 @@
-# MSB + Liquidity Sweep + Michael's Bands (H1)
+# Crypto: MSB + Liquidity Sweep + Michael's Bands
 
-A rules-based version of the **MSB (market structure break) + liquidity** idea
-filtered by **Michael's bands** (a fast/slow EMA trend band), built for:
+A rules-based **crypto** strategy built on the TRW-style idea of a **liquidity
+sweep → market structure break (MSB)**, filtered by **Michael's bands** (a
+fast/slow EMA trend band). It's set up for:
 
 - **Account:** €1000
-- **Location / clock:** Plovdiv, Bulgaria (`Europe/Sofia`, EET/EEST)
-- **Available:** 09:00 – 00:00 local time, so nothing is held overnight
+- **Location:** Plovdiv, Bulgaria (`Europe/Sofia`)
+- **Screen time:** 09:00 – 00:00. Entries happen only while you're awake. The stop-loss
+  and take-profit orders sit on the exchange overnight.
+- **Markets:** USDT perpetual futures on BTC, ETH, SOL, BNB, XRP (1-hour chart)
 
-> ⚠️ **Read the results section before risking money.** The backtests show a *small*
-> edge on EURUSD and gold, a loss on BTC (because of fees), and a weak
-> out-of-sample result overall. This is not a proven money-maker. Run it on a
-> demo account or with 0.5% risk first.
+> ## ⚠️ Read this first: the honest result
+> I tested this on **6.8 years of real Binance futures data (2020 → Nov 2026,
+> 5 coins, ~290,000 candles)** with real fees. **The best version I found is only
+> slightly profitable, and the edge is not statistically proven:**
+>
+> - One €1000 account trading all 5 coins: **€1000 → €1,106 in 6.8 years
+>   (about +1.5%/year)**, with a max drawdown of −10%. **4 of the 7 years were losing years**, including 2026 (−6%).
+> - Average **+0.086R per trade** (R = the amount you risk on a trade). A bootstrap test gives about a **21% chance the
+>   real edge is zero or negative**. So it's roughly "breakeven-plus", not a money-maker.
+> - Most versions of this idea **lose money on crypto** after fees (details below).
+>
+> Treat this as a structured way to learn and journal MSB/liquidity trading on a
+> demo account, **not** as a way to grow €1000. Never risk more than 1% per trade.
 
-> **About "Michael's bands":** I don't have access to TRW course material, so the
-> band is a fast/slow EMA band (default **EMA 21 / EMA 50**, chosen by the
-> backtest below). If the Prof uses different lengths or a different band
-> type, change `band_fast` / `band_slow` in `msb_liq/strategy.py` (or the Pine
-> inputs) and run the backtest again.
+> **About "Michael's bands":** I don't have TRW course access, so the band is
+> an **EMA 21 / EMA 50** band. If the Prof uses other lengths or another band
+> type, change `band_fast` / `band_slow` (Pine inputs, or `CRYPTO` in
+> `msb_liq/crypto.py`), then rerun the backtest.
 
 ---
 
-## The rules (long side, shorts are the mirror image)
+## The rules (1-hour chart; shorts are the mirror image)
 
 | Step | Rule |
 |---|---|
-| 1. Trend (bands) | Only longs when **EMA21 > EMA50**. Only shorts when EMA21 < EMA50. |
-| 2. Liquidity | Mark the last confirmed **swing low** (pivot with 2 candles each side). A **liquidity sweep** is a candle that wicks **below** it and **closes back above** it, taking the stops under the low. |
-| 3. MSB | Within **5 candles** of the sweep, a candle **closes above** the last confirmed **swing high**. That's the market structure break. |
-| 4. Entry | Market buy at the **open of the next candle**. |
-| 5. Stop | Below the sweep wick − 0.1 × ATR(14). Skip the trade if the stop is smaller than 0.5 ATR or bigger than 3 ATR. |
-| 6. Target | **3R** (3 × the stop distance). |
-| 7. Size | Risk **1% of the account** per trade (€10 on €1000). Lots = €10 ÷ stop distance. |
-| 8. Time | New entries **09:00–22:00** Plovdiv time. **Close anything still open at 23:00–00:00.** Max 2 trades per day. |
+| 1. Bands | Longs only when **EMA21 > EMA50**. Shorts only when EMA21 < EMA50. |
+| 2. Liquidity | Mark the last confirmed **swing low**, a pivot with **5 candles on each side**. A **sweep** is a candle that wicks **below** that low and **closes back above** it, grabbing the stops under it. |
+| 3. MSB | Within **5 candles** of the sweep, a candle **closes above** the last confirmed **swing high**. |
+| 4. Entry | Market order at the **open of the next candle**. Only if that candle opens **09:00–22:00 Plovdiv time**. Max 2 trades a day. |
+| 5. Stop | Below the sweep wick − 0.1 × ATR(14). **Skip the trade** if the stop is **less than 1% from entry**, because fees would eat the profit. Also skip it if the stop is under 0.5 ATR or over 3 ATR. |
+| 6. Target | **2R**. |
+| 7. Size | Risk **1% = €10** per trade. Position size = €10 ÷ stop distance, capped at 5× leverage. With a typical 1–2% stop, the position is €500–€1000, so usually **1× leverage or less**. |
+| 8. Overnight | Leave the stop and target orders on the exchange. **Don't move them**. |
 
-Timeframe: **1-hour (H1)** candles.
+**Frequency:** about 2 trades a month across all 5 coins (182 trades in 6.8 years).
+The median trade lasts about 20 hours. 61% of trades hit the stop and 39% hit the 2R target.
 
-### Your day in Plovdiv time
-
-| Time | What happens |
+### Daily routine (Plovdiv time)
+| Time | Action |
 |---|---|
-| 09:00 | Start. Mark the last swing high/low on H1, check the band direction. |
-| 10:00 | London open, the first liquidity sweeps usually happen here. |
-| 16:30 | New York open, the second active window (15:30 for a few weeks in March and Oct/Nov when US and EU clocks change on different dates). |
-| 22:00 | No new trades. |
-| 23:00–00:00 | Close any open trade. Go to bed flat. |
+| 09:00 | Check the 1H charts of the 5 coins: band direction, last swing high/low. Set TradingView alerts on the script. |
+| During the day | On an alert, check the rules above, then place a market entry, stop and target **all at once**. |
+| 22:00 | No new entries. |
+| Night | Orders do the work. Don't wake up to trade. |
 
 ---
 
-## Backtest results
+## Results (chosen settings, fees + funding included)
 
-€1000 start, 1% risk per trade, spreads and fees included (EURUSD 1 pip,
-gold $0.30, BTC 0.1% taker fee per side). If a candle hits both the stop and the
-target, the stop is counted first (conservative). Reproduce with
-`python -m msb_liq.run`.
+Costs: 0.05% taker fee + 0.02% slippage on each side, and 0.01% funding every 8 hours while in a trade.
+When a candle touches both the stop and the target, the stop is counted (conservative).
+Reproduce with `python -m msb_liq.crypto run`.
 
-| Market | Period | Trades | Win % | Avg R | Profit factor | Net | Max DD |
-|---|---|---|---|---|---|---|---|
-| EURUSD | Apr 2017 – Feb 2018 | 28 | 35.7 | +0.10 | 1.23 | **+€26** | −4.7% |
-| EURUSD | 2024 | 42 | 42.9 | +0.17 | 1.40 | **+€71** | −6.1% |
-| Gold (XAUUSD) | Jan – Oct 2025 | 29 | 41.4 | −0.06 | 0.81 | **−€20** | −5.8% |
-| Gold (XAUUSD) | Dec 2025 – Apr 2026 | 13 | 61.5 | +0.45 | 3.00 | **+€59** | −1.8% |
-| BTCUSDT (spot) | Apr – Oct 2026 | 30 | 36.7 | −0.06 | 0.85 | **−€19** | −6.5% |
+**Per coin (each on its own €1000 account, 2020 – Nov 2026):**
 
-![equity](results/equity.png)
+| Coin | Trades | Win % | Avg R | Profit factor | End € | Max DD |
+|---|---|---|---|---|---|---|
+| XRP | 37 | 48.6 | +0.37 | 1.64 | **1,143** | −6.3% |
+| ETH | 38 | 42.1 | +0.19 | 1.28 | **1,069** | −4.3% |
+| BTC | 45 | 37.8 | +0.03 | 1.03 | **1,009** | −9.1% |
+| SOL | 27 | 33.3 | −0.06 | 0.91 | **982** | −11.8% |
+| BNB | 35 | 31.4 | −0.15 | 0.79 | **946** | −8.7% |
 
-### How the settings were chosen (and why to be careful)
+**Per year (all coins):**
 
-`python -m msb_liq.optimize` tests 192 combinations (band lengths, swing
-length, R target, MSB window, flat-at-midnight vs hold overnight). Each dataset
-is split 60% in-sample / 40% out-of-sample. Settings are ranked **only** on the
-in-sample part, then checked on data they never saw (`results/optimize.txt`):
+| 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|
+| −0.08R | **+0.51R** | −0.11R | −0.03R | **+0.42R** | +0.13R | −0.19R |
 
-- The chosen settings rank **#1 in-sample (+0.12R/trade)** and stay positive
-  out-of-sample, **but only just (+0.04R/trade)**.
-- Only **13%** of all combinations were profitable in-sample. Most versions of
-  "MSB + liquidity" lose money after costs, so treat this edge as fragile.
-- **Closing before midnight beats holding overnight.** With stops/targets left
-  running overnight, gold 2025 and BTC each lost about 9%.
-- The 3R target is rarely reached before midnight. Most trades are closed by
-  the session-end rule, so it works more like "catch the intraday move after
-  the MSB" than a 3R strategy.
-- Each dataset has only 13–42 trades. That is too few to be statistically sure.
+**One €1000 account, all 5 coins, one trade at a time:**
+158 trades, **€1,106 at the end**, max drawdown −10%. Yearly returns: 2020 −1.7%, 2021 +10.0%,
+2022 −3.0%, 2023 +1.5%, 2024 +12.0%, 2025 −1.2%, 2026 −6.1%.
 
-### What to trade with €1000
+![crypto equity](results/crypto/equity.png)
 
-1. **EURUSD** was the most consistent (profitable in both periods) and has the
-   lowest costs. Start here.
-2. **Gold** was mixed: one losing period, one good one.
-3. **Avoid BTC spot with this strategy.** The 0.1% fee on each side costs about
-   0.4R per trade and wipes out the edge. Also, a 1%-risk position with a tight
-   stop needs about €2000 notional, which is more than a €1000 spot account
-   can buy.
+Don't pick "just XRP and ETH" because they did best here. That's hindsight. Choosing
+coins after seeing the results is exactly how backtests end up lying.
 
-With €1000 and 1% risk (€10), a EURUSD stop of 15 pips is about 0.07 lots.
-You need a broker that allows **micro lots (0.01)**. On EURUSD 2024 the
-backtest made about €6 a month. That's a skill-building account, not an income.
+---
 
-### Suggested plan before going live
+## How the settings were chosen, and what didn't work
 
-1. Put `pine/msb_liq_michaels_bands.pine` on a TradingView **EURUSD 1H** chart
-   and check the Strategy Tester on as much history as your plan allows.
-2. **Paper or demo trade it for 4–6 weeks** (aim for at least 30 trades) and
-   log every trade.
-3. Go live only if the demo results are close to the backtest. Start at
-   **0.5% risk**.
-4. Hard stop rule: if the account drops 10% (to €900), stop and re-evaluate.
+Settings were ranked **only on 2020–2023**, then checked on **2024–Nov 2026**
+(data they never saw). Full tables are in `results/crypto/optimize_stage*.txt`.
+
+| Test | Settings tried | Profitable 2020–23 | Profitable 2024–26 | Verdict |
+|---|---|---|---|---|
+| 1. Plain MSB + liq + bands, 1h | 216 | 7% | 11% | ❌ Mostly loses after fees |
+| 2. + higher-timeframe trend filter / long-only | 288 | 16% | 27% | ❌ Filter didn't help |
+| 3. Same idea on 4h candles | 96 | 41% | 18% | ❌ Overfit, best in-sample did worse later |
+
+What held up:
+- **Bigger swings (5-candle pivots).** Small swings were mostly noise.
+- **Stop at least 1% from entry.** With tight stops, fees cost about 0.15–0.4R per trade.
+- **Letting stop and target run overnight.** Closing at midnight was clearly worse on crypto.
+- The chosen settings and the similar settings around them were positive in **both** periods:
+  +0.07R in 2020–23 and +0.11R in 2024–26.
+
+---
+
+## Practical setup for €1000 in Bulgaria
+
+1. **Exchange:** use a crypto exchange that's licensed in the EU (MiCA) and
+   available to Bulgarian residents. Check whether it offers perpetual futures
+   to retail EU clients, because some don't. If you can only trade **spot**, the strategy
+   works **long-only**. Spot fees are usually 0.1%, though, which hurts. Use limit/maker orders where you can.
+2. **TradingView:** add `pine/msb_liq_michaels_bands.pine` to a **1H** chart of
+   each coin's perpetual (e.g. `BINANCE:ETHUSDT.P`). Defaults match the settings above.
+   Create an alert on each chart.
+3. **Demo first:** paper trade it for 2–3 months. At about 2 trades a month, even
+   that is only about 5 trades, so the real test is following the rules without exceptions.
+4. **Live:** start at **0.5% risk (€5)**. Stop and re-evaluate if the account drops to €900.
+5. **Tax:** crypto gains are taxable in Bulgaria, so keep the trade log.
 
 ---
 
 ## Files
 
 ```
-msb_liq/strategy.py   strategy + bar-by-bar backtester (no look-ahead)
-msb_liq/data.py       loaders/timezones/costs for the bundled datasets
-msb_liq/run.py        run all markets -> results/summary.csv, trades_*.csv, equity.png
-msb_liq/optimize.py   in-sample / out-of-sample parameter study
-pine/msb_liq_michaels_bands.pine   TradingView version (Pine v5)
-data/                 H1 OHLC data (public GitHub datasets, see below)
+msb_liq/strategy.py      strategy + bar-by-bar backtester (no look-ahead)
+msb_liq/crypto.py        crypto data, costs, chosen settings, optimizer, report
+pine/msb_liq_michaels_bands.pine   TradingView version (defaults = crypto settings)
+data/crypto/*.csv.gz     Binance USD-M 1h candles 2020 -> Nov 2026 (BTC ETH SOL BNB XRP)
+results/crypto/          summary.txt, trades.csv, equity.png, optimize_stage1-3
+FOREX.md                 the earlier EURUSD/gold version (msb_liq/run.py)
 ```
 
 ```bash
 pip install pandas numpy matplotlib
-python -m msb_liq.run                    # backtest, 1% risk
-python -m msb_liq.run --risk 0.5         # 0.5% risk
-python -m msb_liq.run --hold-overnight   # compare: leave SL/TP running overnight
-python -m msb_liq.optimize 15            # parameter robustness table
+python -m msb_liq.crypto run          # report for the chosen settings
+python -m msb_liq.crypto optimize 1   # plain idea, 1h
+python -m msb_liq.crypto optimize 2   # + trend filter / long-only
+python -m msb_liq.crypto optimize 3   # 4h candles
 ```
 
-**Data sources** (public repos, timezones handled in `data.py`):
-EURUSD 2024 (Sigmanumeric78/MACD-crossover), EURUSD 2017–18 (`backtesting.py`
-sample data), XAUUSD 2025 MT5 export (budimanlai/forex-tick), XAUUSD
-2025–26 (TshifhunguCodes/Autonomous-Quant-Research-system), BTCUSDT 2026
-(Agus27712/analisa-pasar). For a serious test, export a few years of H1 data
-from your own broker and add it to `DATASETS`.
+Data source: Binance USD-M futures klines from the public GitHub repo
+`richardrank13-spec/atlas-data`. I checked the files: no broken candles and
+fewer than 5 gaps per coin.
 
-*Not financial advice. Leveraged FX/CFD trading carries a high risk of loss.*
+*Not financial advice. Crypto and leveraged trading carry a high risk of loss.*

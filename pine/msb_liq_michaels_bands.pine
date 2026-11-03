@@ -1,21 +1,25 @@
 //@version=5
 // MSB + Liquidity Sweep + Michael's Bands  (H1)
-// Same rules as msb_liq/strategy.py. Load on a 1H chart (EURUSD recommended).
+// Same rules as msb_liq/strategy.py. Defaults = crypto settings (msb_liq/crypto.py).
+// Load on a 1H chart of a USDT perpetual (e.g. ETHUSDT.P / XRPUSDT.P).
 // Session times are in Plovdiv local time (Europe/Sofia).
 strategy("MSB + Liq + Michael's Bands", overlay=true, initial_capital=1000, currency=currency.EUR,
-     default_qty_type=strategy.fixed, commission_type=strategy.commission.percent, commission_value=0.0,
+     default_qty_type=strategy.fixed, commission_type=strategy.commission.percent, commission_value=0.07,
      slippage=1, process_orders_on_close=false, calc_on_every_tick=false)
 
 // ---------- inputs ----------
 bandFast  = input.int(21, "Michael's band - fast EMA")
 bandSlow  = input.int(50, "Michael's band - slow EMA")
-swingLen  = input.int(2,  "Swing length (pivot left/right)")
+swingLen  = input.int(5,  "Swing length (pivot left/right)")
 msbWindow = input.int(5,  "Bars allowed between sweep and MSB")
-rr        = input.float(3.0, "Take profit (R)")
+rr        = input.float(2.0, "Take profit (R)")
 riskPct   = input.float(1.0, "Risk per trade (% of equity)")
 slBufAtr  = input.float(0.1, "Stop buffer (x ATR)")
 minRisk   = input.float(0.5, "Min stop size (x ATR)")
 maxRisk   = input.float(3.0, "Max stop size (x ATR)")
+minStopPc = input.float(1.0, "Min stop size (% of price) - keeps fees small vs R")
+maxLev    = input.float(5.0, "Max leverage (position notional / equity)")
+closeSess = input.bool(false, "Close trades at session end (off = SL/TP stay on overnight)")
 maxPerDay = input.int(2, "Max trades per day")
 startH    = input.int(9,  "First entry hour (Plovdiv)")
 endH      = input.int(22, "No new entries from hour (Plovdiv)")
@@ -83,8 +87,8 @@ else if not na(bearSweepBar) and bar_index > bearSweepBar and close < swingLow a
     bearSweepBar := na
 
 risk = math.abs(close - stopPx)
-okRisk = risk >= minRisk * a and risk <= maxRisk * a
-qty = okRisk ? strategy.equity * riskPct / 100 / risk : 0.0
+okRisk = risk >= minRisk * a and risk <= maxRisk * a and risk >= close * minStopPc / 100
+qty = okRisk ? math.min(strategy.equity * riskPct / 100 / risk, strategy.equity * maxLev / close) : 0.0
 
 if longSig and okRisk and stopPx < close
     strategy.entry("L", strategy.long, qty=qty)
@@ -96,7 +100,7 @@ if shortSig and okRisk and stopPx > close
     tradesToday += 1
 
 // flat before midnight
-if strategy.position_size != 0 and (h >= flatH or h < startH)
+if closeSess and strategy.position_size != 0 and (h >= flatH or h < startH)
     strategy.close_all(comment="session end")
 
 plotshape(longSig and okRisk,  "MSB long",  shape.triangleup,   location.belowbar, color.teal, size=size.small)

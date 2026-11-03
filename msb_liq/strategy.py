@@ -33,6 +33,7 @@ class Params:
     # Michael's bands (EMA band) - set these to whatever lengths the Prof uses
     band_fast: int = 21
     band_slow: int = 50
+    trend_ema: int = 0          # higher-timeframe filter: longs only above EMA(trend_ema), shorts only below (0 = off)
     # Swing / structure detection
     swing_len: int = 2          # pivot needs N lower highs/higher lows each side
     msb_window: int = 5         # bars after the sweep in which the MSB must happen
@@ -51,7 +52,10 @@ class Params:
     flat_hour: int = 23         # close everything on the bar that opens at 23:00 (done by 00:00)
     # Costs (in price units, round trip handled by applying on entry + exit)
     spread: float = 0.0         # full spread paid on entry
-    commission_pct: float = 0.0  # % of notional per side
+    commission_pct: float = 0.0  # % of notional per side (fees + slippage)
+    funding_pct: float = 0.0    # % of notional paid per 8h funding (perps: 00/08/16 UTC) while in a trade
+    min_risk_pct: float = 0.0   # skip setups whose stop is closer than this % of price (fees would eat R)
+    max_leverage: float = 100.0  # cap position notional at equity x this
     allow_long: bool = True
     allow_short: bool = True
 
@@ -87,6 +91,7 @@ def add_indicators(df: pd.DataFrame, p: Params) -> pd.DataFrame:
     df["band_fast"] = ema(df["close"], p.band_fast)
     df["band_slow"] = ema(df["close"], p.band_slow)
     df["atr"] = atr(df, p.atr_len)
+    df["trend"] = ema(df["close"], p.trend_ema) if p.trend_ema else np.nan
     n = p.swing_len
     w = 2 * n + 1
     # pivot at bar i is known at bar i+n -> shift by n so it's only usable then
@@ -110,12 +115,14 @@ def backtest(df: pd.DataFrame, p: Params, balance: float = 1000.0) -> Result:
     """df: OHLC with a tz-aware DatetimeIndex (any tz, converted to p.tz)."""
     df = add_indicators(df, p)
     local = df.index.tz_convert(p.tz)
+    utc_h = df.index.tz_convert("UTC").hour
     hours = local.hour
     days = local.date
 
     o, h, l, c = (df[k].to_numpy() for k in ("open", "high", "low", "close"))
     bf, bs, a = df["band_fast"].to_numpy(), df["band_slow"].to_numpy(), df["atr"].to_numpy()
     sh, sl = df["swing_high"].to_numpy(), df["swing_low"].to_numpy()
+    tr = df["trend"].to_numpy()
 
     equity = balance
     eq_curve = np.full(len(df), np.nan)
@@ -125,7 +132,7 @@ def backtest(df: pd.DataFrame, p: Params, balance: float = 1000.0) -> Result:
     bull_sweep = None                     # (bar_idx, sweep_low)
     bear_sweep = None                     # (bar_idx, sweep_high)
     trades_today: dict = {}
-    warmup = max(p.band_slow * 3, p.atr_len * 3, 50)
+    warmup = max(p.band_slow * 3, p.atr_len * 3, 50, p.trend_ema)
 
     def close_pos(i, price, reason):
         nonlocal equity, pos
@@ -146,14 +153,18 @@ def backtest(df: pd.DataFrame, p: Params, balance: float = 1000.0) -> Result:
             entry = o[i] + side * p.spread  # pay the full spread on entry (simple + conservative)
             risk = abs(entry - stop)
             if (side == 1 and stop < entry) or (side == -1 and stop > entry):
-                if p.min_risk_atr * a[i - 1] <= risk <= p.max_risk_atr * a[i - 1]:
-                    size = equity * p.risk_pct / 100 / risk
+                if p.min_risk_atr * a[i - 1] <= risk <= p.max_risk_atr * a[i - 1] and risk >= entry * p.min_risk_pct / 100:
+                    size = min(equity * p.risk_pct / 100 / risk, equity * p.max_leverage / entry)
                     fee = size * entry * p.commission_pct / 100
                     equity -= fee
                     pos = Trade(side, df.index[i], entry, stop, entry + side * p.rr * risk, size, entry_cost=fee)
                     trades_today[days[i]] = trades_today.get(days[i], 0) + 1
 
         # 2) manage open position on this bar (stop first = conservative)
+        if pos is not None and p.funding_pct and utc_h[i] % 8 == 0 and df.index[i] > pos.entry_time:
+            fund = pos.size * o[i] * p.funding_pct / 100
+            equity -= fund
+            pos.entry_cost += fund
         if pos is not None:
             if pos.side == 1:
                 if l[i] <= pos.stop:
@@ -183,14 +194,15 @@ def backtest(df: pd.DataFrame, p: Params, balance: float = 1000.0) -> Result:
             bear_sweep = None
 
         # 4) MSB after a sweep -> signal
-        in_window = p.entry_start_hour <= hours[i] + 1 < p.entry_end_hour  # entry happens next bar
+        nh = hours[i + 1] if i + 1 < len(df) else (hours[i] + 1) % 24  # entry happens at the next bar's open
+        in_window = p.entry_start_hour <= nh < p.entry_end_hour
         can_trade = pos is None and in_window and trades_today.get(days[i], 0) < p.max_trades_per_day
         if p.allow_long and bull_sweep and i > bull_sweep[0] and c[i] > sh[i] and c[i - 1] <= sh[i]:
-            if can_trade and bf[i] > bs[i]:
+            if can_trade and bf[i] > bs[i] and (not p.trend_ema or c[i] > tr[i]):
                 pending = (1, bull_sweep[1] - p.sl_buffer_atr * a[i], i)
             bull_sweep = None
         elif p.allow_short and bear_sweep and i > bear_sweep[0] and c[i] < sl[i] and c[i - 1] >= sl[i]:
-            if can_trade and bf[i] < bs[i]:
+            if can_trade and bf[i] < bs[i] and (not p.trend_ema or c[i] < tr[i]):
                 pending = (-1, bear_sweep[1] + p.sl_buffer_atr * a[i], i)
             bear_sweep = None
 

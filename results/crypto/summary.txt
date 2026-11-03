@@ -1,0 +1,28 @@
+Settings: band_fast=21, band_slow=50, trend_ema=0, swing_len=5, msb_window=5, rr=2.0, atr_len=14, sl_buffer_atr=0.1, min_risk_atr=0.5, max_risk_atr=3.0, risk_pct=1.0, max_trades_per_day=2, tz=Europe/Sofia, entry_start_hour=9, entry_end_hour=22, flat_hour=99, spread=0.0, commission_pct=0.07, funding_pct=0.01, min_risk_pct=1.0, max_leverage=5.0, allow_long=True, allow_short=True
+
+== Per coin (each its own EUR 1000 account) ==
+         trades  win_%  avg_R  sum_R    PF  end_eur  max_dd_%
+coin                                                         
+BNBUSDT    35.0   31.4 -0.150   -5.2  0.79    946.0      -8.7
+BTCUSDT    45.0   37.8  0.031    1.4  1.03   1009.0      -9.1
+ETHUSDT    38.0   42.1  0.187    7.1  1.28   1069.0      -4.3
+SOLUSDT    27.0   33.3 -0.056   -1.5  0.91    982.0     -11.8
+XRPUSDT    37.0   48.6  0.374   13.8  1.64   1143.0      -6.3
+
+== Per year (all coins) ==
+      trades  win_%  avg_R  sum_R    PF
+year                                   
+2020    24.0   33.3 -0.075   -1.8  0.88
+2021    23.0   52.2  0.507   11.7  1.98
+2022    25.0   32.0 -0.112   -2.8  0.84
+2023    25.0   36.0 -0.026   -0.6  0.98
+2024    30.0   50.0  0.416   12.5  1.73
+2025    22.0   40.9  0.129    2.8  1.25
+2026    33.0   30.3 -0.187   -6.2  0.73
+
+== All trades: 182 trades, win 39.0%, avg +0.086R, PF 1.12 ==
+
+== One EUR 1000 account trading all 5 coins, max 1 open trade ==
+trades taken 158 | end balance EUR 1,106 | max drawdown -10.0%
+yearly return %: 2020: -1.7, 2021: +10.0, 2022: -3.0, 2023: +1.5, 2024: +12.0, 2025: -1.2, 2026: -6.1
+out-of-sample only (2024+): 69 trades, avg +0.081R
